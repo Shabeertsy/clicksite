@@ -1,17 +1,46 @@
 import Banner from "../Banner";
 import VehicleCard from "./VehicleCard";
-import { useEffect } from "react";
-import { useVehicleStore } from "../../store/vehicleStore";
+import { useEffect, useState } from "react";
+import { baseUrl } from "../../Constants";
+import { useBookingStore } from "../../store/bookingStore";
 
 export function VehicleGrid() {
-  const { vehicles, loading, error, fetchPlaces } = useVehicleStore();
+  const [vehicles, setVehicles] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const pickupCoords = useBookingStore((state) => state.pickupCoords);
+
+
+  const fetchVehicles = async (coords) => {
+    setLoading(true);
+    setError(null);
+    try {
+      let url = `${baseUrl}list-owner-vehicles/`;
+      if (coords && coords.lat && coords.lng) {
+        const params = new URLSearchParams({
+          lat: coords.lat,
+          lng: coords.lng,
+        });
+        url += `?${params.toString()}`;
+      }
+      const res = await fetch(url);
+      const data = await res.json();
+      setVehicles(data.vehicles || []);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
 
   useEffect(() => {
-    fetchPlaces();
-  }, [fetchPlaces]);
+    fetchVehicles(pickupCoords);
+  }, [pickupCoords?.lat, pickupCoords?.lng]);
+
 
   const dynamicData = vehicles.map(vehicle => {
-
     let images = [];
     if (Array.isArray(vehicle.images) && vehicle.images.length > 0) {
       images = vehicle.images
@@ -29,14 +58,14 @@ export function VehicleGrid() {
     return {
       images,
       title: vehicle.registration_number || vehicle.name || "Untitled",
+      id: vehicle.id || null,
       location: vehicle.location || "Unknown Location",
       price: vehicle.price ? `₹${vehicle.price} / Night` : "Price Unavailable",
       facilitiesIcons: vehicle.facilitiesIcons || [],
       moreCount: vehicle.moreCount || 0,
+      vehicle:vehicle || null
     };
   });
-
-  console.log(dynamicData, 'asdfasfdfafd');
 
   const places = dynamicData;
 
@@ -76,6 +105,10 @@ export function VehicleGrid() {
             </div>
           </div>
         </div>
+
+        {/* Loading & Error States */}
+        {loading && <p className="text-center">Loading vehicles...</p>}
+        {error && <p className="text-center text-danger">Error: {error}</p>}
 
         <div className="row justify-content-between">
           {cardsWithBanners}

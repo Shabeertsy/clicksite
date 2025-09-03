@@ -81,8 +81,8 @@ Template Name: DreamsTour - Bootstrap Template
       autoplay: false,
       smartSpeed: 2000,
       navText: [
-        "<i class='fa-solid fa-chevron-left'></i>",
-        "<i class='fa-solid fa-chevron-right'></i>",
+        "<i class='isax isax-arrow-left-2'></i>",
+        "<i class='isax isax-arrow-right-3'></i>",
       ],
       responsive: {
         0: {
@@ -111,8 +111,8 @@ Template Name: DreamsTour - Bootstrap Template
       autoplay: false,
       smartSpeed: 2000,
       navText: [
-        "<i class='fa-solid fa-chevron-left'></i>",
-        "<i class='fa-solid fa-chevron-right'></i>",
+        "<i class='isax isax-arrow-left-2'></i>",
+        "<i class='isax isax-arrow-right-3'></i>",
       ],
       responsive: {
         0: {
@@ -141,8 +141,8 @@ Template Name: DreamsTour - Bootstrap Template
       autoplay: false,
       smartSpeed: 2000,
       navText: [
-        "<i class='fa-solid fa-chevron-left'></i>",
-        "<i class='fa-solid fa-chevron-right'></i>",
+        "<i class='isax isax-arrow-left-2'></i>",
+        "<i class='isax isax-arrow-right-3'></i>",
       ],
       responsive: {
         0: {
@@ -171,8 +171,8 @@ Template Name: DreamsTour - Bootstrap Template
       autoplay: true,
       smartSpeed: 2000,
       navText: [
-        "<i class='fa-solid fa-chevron-left'></i>",
-        "<i class='fa-solid fa-chevron-right'></i>",
+        "<i class='isax isax-arrow-left-2'></i>",
+        "<i class='isax isax-arrow-right-3'></i>",
       ],
       responsive: {
         0: {
@@ -306,8 +306,8 @@ Template Name: DreamsTour - Bootstrap Template
       autoplay: false,
       smartSpeed: 2000,
       navText: [
-        "<i class='fa-solid fa-chevron-left'></i>",
-        "<i class='fa-solid fa-chevron-right'></i>",
+        "<i class='isax isax-arrow-left-2'></i>",
+        "<i class='isax isax-arrow-right-3'></i>",
       ],
       responsive: {
         0: {
@@ -386,8 +386,8 @@ Template Name: DreamsTour - Bootstrap Template
 				dots: false,
 				loop: true,
 				navText: [
-					'<i class="fa-solid fa-chevron-left"></i>',
-					'<i class="fa-solid fa-chevron-right"></i>'
+          "<i class='isax isax-arrow-left-2'></i>",
+          "<i class='isax isax-arrow-right-3'></i>",
 				],
 				responsiveRefreshRate: 200,
 			}).on('changed.owl.carousel', syncPosition);
@@ -401,8 +401,8 @@ Template Name: DreamsTour - Bootstrap Template
 				slideBy: slidesPerPage,
 				responsiveRefreshRate: 100,
 				navText: [
-					'<i class="fa-solid fa-chevron-left"></i>',
-					'<i class="fa-solid fa-chevron-right"></i>'
+          "<i class='isax isax-arrow-left-2'></i>",
+          "<i class='isax isax-arrow-right-3'></i>",
 				],
 			}).on('initialized.owl.carousel', function () {
 				sync2.find(".owl-item").eq(0).addClass("current");
@@ -529,8 +529,8 @@ Template Name: DreamsTour - Bootstrap Template
       smartSpeed: 2000,
       autoplay: false,
       navText: [
-        '<i class="fa-solid fa-chevron-left"></i>',
-        '<i class="fa-solid fa-chevron-right"></i>',
+        "<i class='isax isax-arrow-left-2'></i>",
+        "<i class='isax isax-arrow-right-3'></i>",
       ],
       responsive: {
         0: {
@@ -791,8 +791,8 @@ Template Name: DreamsTour - Bootstrap Template
       autoplay: false,
       smartSpeed: 2000,
       navText: [
-        "<i class='fa-solid fa-chevron-left'></i>",
-        "<i class='fa-solid fa-chevron-right'></i>",
+        "<i class='isax isax-arrow-left-2'></i>",
+        "<i class='isax isax-arrow-right-3'></i>",
       ],
       responsive: {
         0: {
@@ -1022,8 +1022,8 @@ Template Name: DreamsTour - Bootstrap Template
       autoplay: false,
       smartSpeed: 2000,
       navText: [
-        "<i class='fa-solid fa-chevron-left'></i>",
-        "<i class='fa-solid fa-chevron-right'></i>",
+        "<i class='isax isax-arrow-left-2'></i>",
+        "<i class='isax isax-arrow-right-3'></i>",
       ],
       responsive: {
         0: {
@@ -1055,8 +1055,8 @@ Template Name: DreamsTour - Bootstrap Template
       autoplay: true,
       smartSpeed: 2000,
       navText: [
-        "<i class='fa-solid fa-chevron-left'></i>",
-        "<i class='fa-solid fa-chevron-right'></i>",
+        "<i class='isax isax-arrow-left-2'></i>",
+        "<i class='isax isax-arrow-right-3'></i>",
       ],
       responsive: {
         0: {
@@ -1089,8 +1089,8 @@ Template Name: DreamsTour - Bootstrap Template
       autoplay: false,
       smartSpeed: 2000,
       navText: [
-        "<i class='fa-solid fa-chevron-left'></i>",
-        "<i class='fa-solid fa-chevron-right'></i>",
+        "<i class='isax isax-arrow-left-2'></i>",
+        "<i class='isax isax-arrow-right-3'></i>",
       ],
       responsive: {
         0: {
@@ -1116,8 +1116,8 @@ Template Name: DreamsTour - Bootstrap Template
       autoplay: false,
       smartSpeed: 2000,
       navText: [
-        "<i class='fa-solid fa-chevron-left'></i>",
-        "<i class='fa-solid fa-chevron-right'></i>",
+        "<i class='isax isax-arrow-left-2'></i>",
+        "<i class='isax isax-arrow-right-3'></i>",
       ],
       responsive: {
         0: {
@@ -1843,8 +1843,8 @@ Template Name: DreamsTour - Bootstrap Template
       autoplay: false,
       smartSpeed: 2000,
       navText: [
-        "<i class='fa-solid fa-chevron-left'></i>",
-        "<i class='fa-solid fa-chevron-right'></i>",
+        "<i class='isax isax-arrow-left-2'></i>",
+        "<i class='isax isax-arrow-right-3'></i>",
       ],
       responsive: {
         0: {

@@ -1,71 +1,152 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
+import CustomDropdown from "../CustomDropdown";
+import BookingModal from "../BookingModal";
+import { useVehicleStore } from "../../store/vehicleStore";
 
-// VehicleCard component: Handles rendering of a single place card
-const VehicleCard = ({ images, title, location, price, facilitiesIcons, moreCount }) => {
-  // Dummy images data as per the provided HTML snippet
+function calculateTotalAmount(vehicle, distanceValue) {
+  if (!distanceValue || !vehicle) return null;
+  const distanceKm = distanceValue / 1000;
+  const minFare =
+    Number(vehicle.minimum_fare) >= 0 ? Number(vehicle.minimum_fare) : 0;
+  const perKmRate = Number(vehicle.per_kilometer_rate) || 0;
+  const fixedKm = Number(vehicle.fixed_km) || 100;
+
+  if (minFare > 0) {
+    if (distanceKm <= fixedKm) {
+      return minFare;
+    } else {
+      return minFare + Math.round((distanceKm - fixedKm) * perKmRate);
+    }
+  } else {
+    return Math.round(distanceKm * perKmRate);
+  }
+}
+
+const VehicleCard = ({
+  images,
+  title,
+  location,
+  price,
+  facilitiesIcons,
+  moreCount,
+  vehicle,
+}) => {
+  const vehicleData =
+    vehicle ||
+    {
+      images,
+      title,
+      location,
+      price,
+      facilitiesIcons,
+      moreCount,
+    };
+
+  const distance = useVehicleStore((state) => state.distance);
+
+  const [calculatedAmount, setCalculatedAmount] = useState(null);
+
+  useEffect(() => {
+    if (distance && distance.value && vehicleData) {
+      setCalculatedAmount(calculateTotalAmount(vehicleData, distance.value));
+    } else {
+      setCalculatedAmount(null);
+    }
+  }, [distance.value, vehicleData]);
+
+  
+  const openBookingModal = (e) => {
+    e.preventDefault();
+    if (window.bootstrap) {
+      const modalEl = document.getElementById("bookingModal");
+      if (modalEl) {
+        const modal = window.bootstrap.Modal.getOrCreateInstance(modalEl);
+        modal.show();
+      }
+    } else if (window.$ && window.$.fn && window.$.fn.modal) {
+      window.$("#bookingModal").modal("show");
+    }
+  };
 
   return (
-    <div className="col-lg-4">
-      <div className="place-item mb-4">
-        <div className="place-img">
-          <div className="img-slider image-slide owl-carousel nav-center">
-          {Array.isArray(images) && images.length > 0 ? (
-            images.map((img, i) => (
-              <div key={i} className="slide-images">
-                <a href="hotel-details.html">
-                  <img
-                    src={img?.image ? img.image : img}
-                    className="img-fluid"
-                    alt={`vehicle-img-${i}`}
-                    onError={e => { e.target.onerror = null; e.target.src = "/default-vehicle.jpg"; }}
-                  />
-                </a>
-              </div>
-            ))
-          ) : (
-            <div className="slide-images">
-              <a href="hotel-details.html">
-                <img src="/default-vehicle.jpg" className="img-fluid" alt="default vehicle" />
+    <>
+      <div className="col-lg-4">
+        <div className="place-item mb-4">
+          <div className="place-img">
+            <div className="img-slider image-slide owl-carousel nav-center">
+              {Array.isArray(images) && images.length > 0 ? (
+                images.map((img, i) => (
+                  <div key={i} className="slide-images">
+                    <a href="hotel-details.html">
+                      <img
+                        src={img?.image ? img.image : img}
+                        className="img-fluid"
+                        alt={`vehicle-img-${i}`}
+                        onError={e => { e.target.onerror = null; e.target.src = "/default-vehicle.jpg"; }}
+                      />
+                    </a>
+                  </div>
+                ))
+              ) : (
+                <div className="slide-images">
+                  <a href="hotel-details.html">
+                    <img src="/default-vehicle.jpg" className="img-fluid" alt="default vehicle" />
+                  </a>
+                </div>
+              )}
+            </div>
+            <div className="fav-item">
+              <a href="" className="fav-icon selected">
+                <i className="isax isax-heart5"></i>
               </a>
             </div>
-          )}
-
           </div>
-          <div className="fav-item">
-            <a href="" className="fav-icon selected">
-              <i className="isax isax-heart5"></i>
-            </a>
-          </div>
-        </div>
-        <div className="place-content">
-          <h5 className="mb-1">
-            <a href="hotel-details.html">{title}</a>
-          </h5>
-          <p className="d-flex align-items-center mb-2">
-            <i className="isax isax-location5 me-2"></i> {location}
-          </p>
-          <div className="border-top pt-2 mb-2">
-            <h6 className="d-flex align-items-center">
-              Facilities:
-              {facilitiesIcons.map((icon, i) => (
-                <i key={i} className={`isax ${icon} ms-2 me-2 text-primary`}></i>
-              ))}
-              <a href="javascript:void(0);" className="fs-14 fw-normal text-default d-inline-block">
-                +{moreCount}
-              </a>
-            </h6>
-          </div>
-          <div className="d-flex align-items-center justify-content-between border-top pt-3">
-            <h5 className="text-primary">
-              {price} <span className="fs-14 fw-normal text-default"></span>
+          <div className="place-content">
+            <h5 className="mb-1">
+              <a href="hotel-details.html">{title}</a>
             </h5>
-            <a href="javascript:void(0);" className="btn btn-primary" data-bs-toggle="modal" data-bs-target="#bookingModal">
-              Book Now
-            </a>
+            <p className="d-flex align-items-center mb-2">
+              <i className="isax isax-location5 me-2"></i> {location}
+            </p>
+            <div className="border-top pt-2 mb-2">
+              <h6 className="d-flex align-items-center">
+                Facilities:
+                {facilitiesIcons.map((icon, i) => (
+                  <i key={i} className={`isax ${icon} ms-2 me-2 text-primary`}></i>
+                ))}
+                <a href="javascript:void(0);" className="fs-14 fw-normal text-default d-inline-block">
+                  +{moreCount}
+                </a>
+              </h6>
+            </div>
+            <div className="d-flex align-items-center justify-content-between border-top pt-3">
+              <h5 className="text-primary">
+                {calculatedAmount !== null && calculatedAmount !== undefined ? (
+                  <>
+                    ₹{calculatedAmount}
+                    <span className="fs-14 fw-normal text-default ms-2">
+                      (est. for {distance.text})
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    {price} <span className="fs-14 fw-normal text-default"></span>
+                  </>
+                )}
+              </h5>
+              <button
+                className="btn btn-primary"
+                type="button"
+                onClick={openBookingModal}
+              >
+                Book Now
+              </button>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+      <BookingModal vehicle={vehicleData} />
+    </>
   );
 };
 

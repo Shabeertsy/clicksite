@@ -1,604 +1,466 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import Slider from "react-slick";
+import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { baseUrl } from "../Constants";
+import { useBookingStore } from "../store/bookingStore";
+import DatePicker from "./Datepicker/DatePicker";
 
-// Levenshtein distance function for typo correction
-const levenshteinDistance = (a, b) => {
-  const matrix = Array(b.length + 1)
-    .fill()
-    .map(() => Array(a.length + 1).fill(0));
-  for (let i = 0; i <= a.length; i++) matrix[0][i] = i;
-  for (let j = 0; j <= b.length; j++) matrix[j][0] = j;
-  for (let j = 1; j <= b.length; j++) {
-    for (let i = 1; i <= a.length; i++) {
-      const indicator = a[i - 1] === b[j - 1] ? 0 : 1;
-      matrix[j][i] = Math.min(
-        matrix[j][i - 1] + 1,
-        matrix[j - 1][i] + 1,
-        matrix[j - 1][i - 1] + indicator
-      );
-    }
-  }
-  return matrix[b.length][a.length];
-};
 
-const correctedCity = (query, suggestions) => {
-  if (!suggestions || suggestions.length === 0) {
-    return { city: query, placeId: null };
+
+function formatDateToYMD(dateStr) {
+  if (!dateStr) return "";
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    const pad = (n) => (n < 10 ? "0" + n : n);
+    return (
+      d.getFullYear() +
+      "-" +
+      pad(d.getMonth() + 1) +
+      "-" +
+      pad(d.getDate())
+    );
+  } catch {
+    return dateStr;
   }
-  let minDistance = Infinity;
-  let bestMatch = null;
-  suggestions.forEach((suggestion) => {
-    if (suggestion.city) {
-      const dist = levenshteinDistance(query.toLowerCase(), suggestion.city.toLowerCase());
-      if (dist < minDistance && dist <= 3) {
-        minDistance = dist;
-        bestMatch = suggestion;
-      }
-    } else {
-      console.warn("Invalid suggestion format:", suggestion);
-    }
+}
+
+const BookingModal = ({ vehicle, pkg }) => {
+  const [showSuccessPopup, setShowSuccessPopup] = useState(false);
+
+  const [tripTypes, setTripTypes] = useState([]);
+  const [form, setForm] = useState({
+    client_name: "",
+    phone: "",
+    pickup: "",
+    dropoff: "",
+    pickupDate: "",
+    returnDate: "",
+    tripType: "",
+    view_points: "",
   });
-  if (bestMatch) {
-    return { city: bestMatch.city, placeId: bestMatch.id };
-  }
-  return { city: query, placeId: null };
-};
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [fieldErrors, setFieldErrors] = useState({});
 
-export function BookingModal({ onSubmit, onPickupChange, setDistanceText, setDistanceValue, setForm, form, onDropChange }) {
-  const today = new Date().toISOString().split("T")[0];
+  const pickupLocationStore = useBookingStore((state) => state.pickupLocation);
+  const dropoffLocationStore = useBookingStore((state) => state.dropoffLocation);
 
-  const [vehicleTypes, setVehicleTypes] = useState([]);
-  const [imageUrls, setImageUrls] = useState([]);
-  const [loadingTypes, setLoadingTypes] = useState(true);
-  const [typesError, setTypesError] = useState(null);
-
-  // Suggestions state for dropdowns
-  const [pickupSuggestions, setPickupSuggestions] = useState([]);
-  const [dropoffSuggestions, setDropoffSuggestions] = useState([]);
-  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState({ pickup: false, dropoff: false });
-  const [suggestionSelected, setSuggestionSelected] = useState({ pickup: false, dropoff: false });
-
-  const [pickupCoords, setPickupCoords] = useState({ lat: null, lng: null });
-  const [dropoffCoords, setDropoffCoords] = useState({ lat: null, lng: null });
-  const [searchResults, setSearchResults] = useState([]);
-
-  const pickupRef = useRef(null);
-  const dropoffRef = useRef(null);
-
-  // Local form state
-  const [localForm, setLocalForm] = useState(
-    form || {
-      pickup: "",
-      dropoff: "",
-      pickupDate: today,
-      pickupTime: "",
-      returnDate: today,
-      returnTime: "",
-      vehicleType: "",
-    }
-  );
-
-  // Keep localForm in sync with parent form if provided
   useEffect(() => {
-    if (form) setLocalForm(form);
-  }, [form]);
+    setForm((prev) => ({
+      ...prev,
+      pickup: pickupLocationStore || "",
+      dropoff: dropoffLocationStore || "",
+    }));
+  }, [pickupLocationStore, dropoffLocationStore]);
 
-  // Google Maps script loader
   useEffect(() => {
-    if (!window.google || !window.google.maps) {
-      const script = document.createElement("script");
-      script.async = true;
-      script.defer = true;
-      document.head.appendChild(script);
-    }
-  }, []);
-
-  // Fetch vehicle types
-  useEffect(() => {
-    const fetchVehicleTypes = async () => {
-      setLoadingTypes(true);
-      setTypesError(null);
+    const fetchTripTypes = async () => {
       try {
-        const response = await axios.get(`${baseUrl}api/list-vehicle-types/`);
-        let types = response.data;
-        if (Array.isArray(types)) {
-          const normalizedTypes = types.map((type) => ({
-            id: type.id ?? type.vehicle_type ?? JSON.stringify(type),
-            label: type.label ?? type.vehicle_type ?? "Unknown",
-            seat_capacity: type.seat_capacity ?? "-",
-            type_name: type.type_name ?? type.label ?? type.vehicle_type ?? "Unknown",
-            icon: type.icon ?? null,
-          }));
-          setVehicleTypes(normalizedTypes);
-        }
-      } catch {
-        setTypesError("Failed to load vehicle types");
-        setVehicleTypes([]);
-      } finally {
-        setLoadingTypes(false);
-      }
-    };
-    fetchVehicleTypes();
-  }, []);
-
-  // Fetch banner images
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const response = await axios.get(`${baseUrl}api/list-banner-images/`);
-        const urls = Array.isArray(response.data) ? response.data.map((item) => item.url) : [];
-        setImageUrls(urls);
-      } catch (error) {}
-    };
-    fetchData();
-  }, []);
-
-  // Fetch location suggestions for dropdown (from Google Places or fallback to backend)
-  const fetchLocationSuggestions = useCallback(
-    async (query, forField) => {
-      if (!query || query.length < 2) {
-        if (forField === "pickup") setPickupSuggestions([]);
-        else setDropoffSuggestions([]);
-        setIsLoadingSuggestions((prev) => ({ ...prev, [forField]: false }));
-        return [];
-      }
-
-      setIsLoadingSuggestions((prev) => ({ ...prev, [forField]: true }));
-
-      // Try Google Places API first
-      if (window.google && window.google.maps && window.google.maps.places) {
-        const autocompleteService = new window.google.maps.places.AutocompleteService();
-        try {
-          const response = await new Promise((resolve, reject) => {
-            autocompleteService.getPlacePredictions(
-              {
-                input: query,
-                types: ["(regions)"],
-                componentRestrictions: { country: "in" },
-              },
-              (predictions, status) => {
-                if (status === window.google.maps.places.PlacesServiceStatus.OK) {
-                  resolve(predictions || []);
-                } else {
-                  reject(new Error(status));
-                }
-              }
-            );
-          });
-
-          const suggestions = response
-            .map((prediction) => {
-              const terms = prediction.structured_formatting?.secondary_text?.split(", ") || [];
-              if (terms.some((term) => term.includes("India"))) {
-                return {
-                  id: prediction.place_id,
-                  city: prediction.structured_formatting?.main_text || prediction.description || "",
-                  district: terms[0] || "",
-                  state: terms[1] || "",
-                  lat: null,
-                  lng: null,
-                };
-              }
-              return null;
-            })
-            .filter((suggestion) => suggestion !== null);
-
-          if (forField === "pickup") setPickupSuggestions(suggestions);
-          else setDropoffSuggestions(suggestions);
-
-          setIsLoadingSuggestions((prev) => ({ ...prev, [forField]: false }));
-          return suggestions;
-        } catch (error) {
-          // fallback to backend below
-        }
-      }
-
-      // Fallback: backend API
-      try {
-        const response = await axios.get(`${baseUrl}api/location-search-by-map/`, {
-          params: { q: query, page: 1, country: "in" },
+        const response = await axios.get(`${baseUrl}list-trip-types/`, {
+          headers: { "Content-Type": "application/json" },
         });
-        const suggestions = Array.isArray(response.data.results)
-          ? response.data.results.filter((suggestion) =>
-              suggestion.state?.toLowerCase().includes("india") ||
-              suggestion.district?.toLowerCase().includes("india") ||
-              suggestion.city?.toLowerCase().includes("india")
-            )
-          : [];
-        if (forField === "pickup") setPickupSuggestions(suggestions);
-        else setDropoffSuggestions(suggestions);
-        setIsLoadingSuggestions((prev) => ({ ...prev, [forField]: false }));
-        return suggestions;
-      } catch (error) {
-        if (forField === "pickup") setPickupSuggestions([]);
-        else setDropoffSuggestions([]);
-        setIsLoadingSuggestions((prev) => ({ ...prev, [forField]: false }));
-        return [];
-      }
-    },
-    [setPickupSuggestions, setDropoffSuggestions]
-  );
-
-  // Fetch place details (lat/lng) for a selected suggestion
-  const fetchPlaceDetails = (placeId, forField) => {
-    if (!placeId || !window.google || !window.google.maps || !window.google.maps.places) {
-      return;
-    }
-    const placesService = new window.google.maps.places.PlacesService(document.createElement("div"));
-    placesService.getDetails(
-      { placeId, fields: ["geometry"] },
-      (place, status) => {
-        if (status === window.google.maps.places.PlacesServiceStatus.OK && place.geometry) {
-          const lat = place.geometry.location.lat();
-          const lng = place.geometry.location.lng();
-          if (lat >= 6 && lat <= 37 && lng >= 68 && lng <= 97) {
-            if (forField === "pickup") {
-              setPickupCoords({ lat, lng });
-              if (typeof onPickupChange === "function") {
-                onPickupChange({ lat, lng });
-              }
-            } else {
-              onDropChange && onDropChange({ lat, lng });
-              setDropoffCoords({ lat, lng });
-            }
-          } else {
-            alert("Selected location is not in India.");
+        const data = response.data;
+        if (Array.isArray(data)) {
+          setTripTypes(data);
+          if (data.length > 0 && !form.tripType) {
+            setForm((prev) => ({ ...prev, tripType: data[0].id }));
           }
-        }
-      }
-    );
-  };
-
-  // Handle input change for pickup/dropoff
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setLocalForm((prev) => ({ ...prev, [name]: value }));
-    setForm && setForm((prev) => ({ ...prev, [name]: value }));
-
-    if (name === "pickup") {
-      setSuggestionSelected((prev) => ({ ...prev, pickup: false }));
-      fetchLocationSuggestions(value, "pickup");
-      setPickupCoords({ lat: null, lng: null });
-    }
-    if (name === "dropoff") {
-      setSuggestionSelected((prev) => ({ ...prev, dropoff: false }));
-      fetchLocationSuggestions(value, "dropoff");
-      setDropoffCoords({ lat: null, lng: null });
-    }
-  };
-
-  // Handle blur for pickup input
-  const handlePickupBlur = async () => {
-    if (suggestionSelected.pickup) {
-      setPickupSuggestions([]);
-      return;
-    }
-    if (localForm.pickup && localForm.pickup.length >= 2) {
-      const suggestions = await fetchLocationSuggestions(localForm.pickup, "pickup");
-      if (suggestions.length > 0) {
-        const corrected = correctedCity(localForm.pickup, suggestions);
-        setLocalForm((prev) => ({ ...prev, pickup: corrected.city }));
-        setForm && setForm((prev) => ({ ...prev, pickup: corrected.city }));
-        if (corrected.placeId) {
-          fetchPlaceDetails(corrected.placeId, "pickup");
-        }
-      } else {
-        alert("Please enter a valid location in India.");
-      }
-      setPickupSuggestions([]);
-    }
-  };
-
-  // Handle blur for dropoff input
-  const handleDropoffBlur = async () => {
-    if (suggestionSelected.dropoff) {
-      setDropoffSuggestions([]);
-      return;
-    }
-    if (localForm.dropoff && localForm.dropoff.length >= 2) {
-      const suggestions = await fetchLocationSuggestions(localForm.dropoff, "dropoff");
-      if (suggestions.length > 0) {
-        const corrected = correctedCity(localForm.dropoff, suggestions);
-        setLocalForm((prev) => ({ ...prev, dropoff: corrected.city }));
-        setForm && setForm((prev) => ({ ...prev, dropoff: corrected.city }));
-        if (corrected.placeId) {
-          fetchPlaceDetails(corrected.placeId, "dropoff");
-        }
-      } else {
-        alert("Please enter a valid location in India.");
-      }
-      setDropoffSuggestions([]);
-    }
-  };
-
-  // Fetch distance between pickup and dropoff
-  const fetchDistance = () => {
-    if (!pickupCoords.lat || !pickupCoords.lng || !dropoffCoords.lat || !dropoffCoords.lng) {
-      setDistanceText && setDistanceText("");
-      setDistanceValue && setDistanceValue(null);
-      return;
-    }
-
-    if (!window.google || !window.google.maps) {
-      setDistanceText && setDistanceText("Google Maps not loaded");
-      setDistanceValue && setDistanceValue(null);
-      return;
-    }
-
-    const service = new window.google.maps.DistanceMatrixService();
-    service.getDistanceMatrix(
-      {
-        origins: [new window.google.maps.LatLng(pickupCoords.lat, pickupCoords.lng)],
-        destinations: [new window.google.maps.LatLng(dropoffCoords.lat, dropoffCoords.lng)],
-        travelMode: window.google.maps.TravelMode.DRIVING,
-      },
-      (response, status) => {
-        if (
-          status === "OK" &&
-          response.rows &&
-          response.rows.length > 0 &&
-          response.rows[0].elements &&
-          response.rows[0].elements.length > 0 &&
-          response.rows[0].elements[0].status === "OK"
-        ) {
-          const element = response.rows[0].elements[0];
-          setDistanceText && setDistanceText(element.distance.text);
-          setDistanceValue && setDistanceValue(element.distance.value);
         } else {
-          setDistanceText && setDistanceText(status === "OK" ? "Distance not available" : "Error fetching distance");
-          setDistanceValue && setDistanceValue(null);
+          setError("Failed to fetch trip types.");
         }
+      } catch (err) {
+        setError("Error fetching trip types: " + (err?.message || ""));
       }
-    );
+    };
+    fetchTripTypes();
+  }, []);
+
+
+  
+  const handleChange = (e) => {
+    const { id, value } = e.target;
+    setForm((prev) => ({
+      ...prev,
+      [id]: value,
+    }));
+    setFieldErrors((prev) => ({ ...prev, [id]: undefined }));
   };
 
-  // Handle form submit
+  // Helper to close modal using Bootstrap API
+  const closeModal = () => {
+    // Try Bootstrap 5 API
+    const modalEl = document.getElementById("bookingModal");
+    if (modalEl && window.bootstrap && window.bootstrap.Modal) {
+      const modalInstance = window.bootstrap.Modal.getOrCreateInstance(modalEl);
+      modalInstance.hide();
+    } else if (window.$ && window.$.fn && window.$.fn.modal) {
+      // fallback for jQuery-based Bootstrap
+      window.$("#bookingModal").modal("hide");
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const params = {
-      lat: pickupCoords.lat ?? null,
-      lng: pickupCoords.lng ?? null,
-      type: localForm.vehicleType || null,
-    };
-    fetchDistance();
+    setError("");
+    setSuccess("");
+    setFieldErrors({});
     try {
-      const response = await axios.get(`${baseUrl}api/list-owner-vehicles/`, { params });
-      setSearchResults(response.data);
-      if (typeof onSubmit === "function") {
-        onSubmit(response.data);
+      const pickupDateFormatted = formatDateToYMD(form.pickupDate);
+      const returnDateFormatted = formatDateToYMD(form.returnDate);
+
+      const tripStartDate = pickupDateFormatted || "";
+      const tripEndDate = returnDateFormatted || "";
+
+      const bookingPayload = {
+        phone_number: form.phone,
+        trip_type: form.tripType,
+        owner_vehicle: vehicle?.id,
+        trip_start_date: tripStartDate,
+        trip_end_date: tripEndDate,
+        from_location:
+          pkg && pkg.start_location_text
+            ? pkg.start_location_text
+            : form.pickup,
+        to_location:
+          pkg && pkg.destination_text
+            ? pkg.destination_text
+            : form.dropoff,
+        is_from_trip: !!form.returnDate,
+        view_points: form.view_points,
+        client_name: form.client_name,
+        package: pkg && pkg.id,
+      };
+
+      const response = await fetch(`${baseUrl}book-vehicle/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(bookingPayload),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || data.success === false) {
+        // Try to extract field errors
+        if (data.errors) {
+          setFieldErrors(data.errors);
+          setError("Please correct the highlighted errors.");
+        } else if (data.message) {
+          setError(data.message);
+        } else {
+          setError("Booking failed");
+        }
+        return;
       }
-    } catch (error) {
-      setSearchResults([]);
+
+      setSuccess("Booking successful!");
+      setForm({
+        client_name: "",
+        phone: "",
+        pickup: "",
+        dropoff: "",
+        pickupDate: "",
+        returnDate: "",
+        tripType: "",
+        view_points: "",
+      });
+
+      // Show custom popup and auto close modal after 2 seconds
+      setShowSuccessPopup(true);
+      setTimeout(() => {
+        setShowSuccessPopup(false);
+        closeModal();
+      }, 2000);
+    } catch (err) {
+      setError(err.message || "Booking failed");
     }
   };
 
-  // Hide suggestions when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (pickupRef.current && !pickupRef.current.contains(event.target)) {
-        setPickupSuggestions([]);
-      }
-      if (dropoffRef.current && !dropoffRef.current.contains(event.target)) {
-        setDropoffSuggestions([]);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  // Generate time options for select
-  const generateTimeOptions = () =>
-    [...Array(24)].map((_, i) => {
-      const time = `${String(i).padStart(2, "0")}:00`;
-      return <option key={i} value={time}>{time}</option>;
-    });
-
-  const sliderSettings = {
-    dots: true,
-    infinite: true,
-    speed: 500,
-    slidesToShow: 1,
-    slidesToScroll: 1,
-    autoplay: true,
-    arrows: false,
-  };
-
-  // Modal content
   return (
-    <div
-      className="modal fade"
-      id="bookingModal"
-      tabIndex="-1"
-      aria-labelledby="bookingModalLabel"
-      aria-hidden="true"
-    >
-      <div className="modal-dialog modal-lg modal-dialog-centered">
-        <div className="modal-content rounded-3 border-0 shadow">
-          <div className="modal-header bg-primary ">
-            <h5 className="modal-title text-white" id="bookingModalLabel">
-              Book Your Vehicle
-            </h5>
-            <button
-              type="button"
-              className="btn-close btn-close-white"
-              data-bs-dismiss="modal"
-              aria-label="Close"
-            ></button>
+    <>
+      {/* Custom Success Popup */}
+      {showSuccessPopup && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            zIndex: 2000,
+            width: "100vw",
+            height: "100vh",
+            background: "rgba(0,0,0,0.3)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <div
+            style={{
+              background: "#fff",
+              borderRadius: "12px",
+              padding: "2rem 2.5rem",
+              boxShadow: "0 2px 24px rgba(0,0,0,0.15)",
+              textAlign: "center",
+              minWidth: "320px",
+              maxWidth: "90vw",
+            }}
+          >
+            <div style={{ fontSize: "2.5rem", color: "#198754", marginBottom: "1rem" }}>
+              <i className="isax isax-tick-circle"></i>
+            </div>
+            <h4 style={{ color: "#198754", marginBottom: "0.5rem" }}>Booking Successful!</h4>
+            <div>Your booking has been confirmed.</div>
+            <div style={{ marginTop: "1.5rem", color: "#888", fontSize: "0.95rem" }}>
+              Closing in 2 seconds...
+            </div>
           </div>
-          <div className="modal-body">
-            <form id="bookingForm" onSubmit={handleSubmit} autoComplete="off">
-              <div className="row">
-                <div className="col-md-6 mb-3">
-                  <label className="form-label">Pick Up Location</label>
-                  <div className="position-relative" ref={pickupRef}>
+        </div>
+      )}
+
+      <div
+        className="modal fade"
+        id="bookingModal"
+        tabIndex={-1}
+        aria-labelledby="bookingModalLabel"
+        aria-hidden="true"
+      >
+        <div className="modal-dialog modal-lg modal-dialog-centered">
+          <div className="modal-content rounded-3 border-0 shadow">
+            {/* Header */}
+            <div className="modal-header bg-primary ">
+              <h5 className="modal-title text-white" id="bookingModalLabel">
+                Book Your Stay
+              </h5>
+              <button
+                type="button"
+                className="btn-close btn-close-white"
+                data-bs-dismiss="modal"
+                aria-label="Close"
+              ></button>
+            </div>
+            {/* Body */}
+            <div className="modal-body">
+              {error && (
+                <div className="alert alert-danger" role="alert">
+                  {error}
+                </div>
+              )}
+              {/* Remove default success alert, use custom popup instead */}
+              <form id="bookingForm" onSubmit={handleSubmit}>
+                <div className="row">
+                  {/* Name */}
+                  <div className="col-md-4 mb-3">
+                    <label htmlFor="client_name" className="form-label">
+                      Full Name
+                    </label>
                     <input
-                      name="pickup"
-                      placeholder="Enter your pickup location"
-                      value={localForm.pickup}
-                      onChange={handleChange}
-                      onBlur={handlePickupBlur}
-                      className="form-control"
-                      autoComplete="off"
+                      type="text"
+                      id="client_name"
+                      className={`form-control${fieldErrors.client_name ? " is-invalid" : ""}`}
+                      placeholder="Enter your name"
                       required
+                      value={form.client_name}
+                      onChange={handleChange}
                     />
-                    {isLoadingSuggestions.pickup && (
-                      <span className="position-absolute end-0 top-50 translate-middle-y text-secondary px-2">Loading...</span>
+                    {fieldErrors.client_name && (
+                      <div className="invalid-feedback">
+                        {fieldErrors.client_name.join
+                          ? fieldErrors.client_name.join(" ")
+                          : fieldErrors.client_name}
+                      </div>
                     )}
-                    {pickupSuggestions.length > 0 && (
-                      <ul className="list-group position-absolute w-100 z-3" style={{ maxHeight: 180, overflowY: "auto" }}>
-                        {pickupSuggestions.map((item) => (
-                          <li
-                            key={item.id}
-                            className="list-group-item list-group-item-action"
-                            onMouseDown={() => {
-                              setLocalForm((prev) => ({ ...prev, pickup: item.city }));
-                              setForm && setForm((prev) => ({ ...prev, pickup: item.city }));
-                              setSuggestionSelected((prev) => ({ ...prev, pickup: true }));
-                              fetchPlaceDetails(item.id, "pickup");
-                              setPickupSuggestions([]);
-                            }}
-                          >
-                            <span className="fw-bold">{item.city}</span>
-                            {item.district && <span className="text-secondary ms-1">{item.district}</span>}
-                            {item.state && <span className="text-muted ms-1">{item.state}</span>}
-                          </li>
-                        ))}
-                      </ul>
+                  </div>
+                  {/* Phone */}
+                  <div className="col-md-4 mb-3">
+                    <label htmlFor="phone" className="form-label">
+                      Phone
+                    </label>
+                    <input
+                      type="tel"
+                      id="phone"
+                      className={`form-control${fieldErrors.phone_number ? " is-invalid" : ""}`}
+                      placeholder="Enter your phone"
+                      required
+                      value={form.phone}
+                      onChange={handleChange}
+                    />
+                    {fieldErrors.phone_number && (
+                      <div className="invalid-feedback">
+                        {fieldErrors.phone_number.join
+                          ? fieldErrors.phone_number.join(" ")
+                          : fieldErrors.phone_number}
+                      </div>
+                    )}
+                  </div>
+                  {/* Pick Up Location */}
+                  <div className="col-md-4 mb-3">
+                    <label htmlFor="pickup" className="form-label">
+                      Pick Up Location
+                    </label>
+                    <input
+                      type="text"
+                      id="pickup"
+                      className={`form-control${fieldErrors.from_location ? " is-invalid" : ""}`}
+                      placeholder="Enter pick up location"
+                      required
+                      value={form.pickup}
+                      onChange={handleChange}
+                    />
+                    {pickupLocationStore && (
+                      <div className="form-text text-success"></div>
+                    )}
+                    {fieldErrors.from_location && (
+                      <div className="invalid-feedback">
+                        {fieldErrors.from_location.join
+                          ? fieldErrors.from_location.join(" ")
+                          : fieldErrors.from_location}
+                      </div>
                     )}
                   </div>
                 </div>
-                <div className="col-md-6 mb-3">
-                  <label className="form-label">Drop Off Location</label>
-                  <div className="position-relative" ref={dropoffRef}>
+
+                <div className="row">
+                  {/* Drop Off Location */}
+                  <div className="col-md-4 mb-3">
+                    <label htmlFor="dropoff" className="form-label">
+                      Drop Off Location
+                    </label>
                     <input
-                      name="dropoff"
-                      placeholder="Enter your dropoff location"
-                      value={localForm.dropoff}
-                      onChange={handleChange}
-                      onBlur={handleDropoffBlur}
-                      className="form-control"
-                      autoComplete="off"
+                      type="text"
+                      id="dropoff"
+                      className={`form-control${fieldErrors.to_location ? " is-invalid" : ""}`}
+                      placeholder="Enter drop off location"
                       required
+                      value={form.dropoff}
+                      onChange={handleChange}
                     />
-                    {isLoadingSuggestions.dropoff && (
-                      <span className="position-absolute end-0 top-50 translate-middle-y text-secondary px-2">Loading...</span>
+                    {dropoffLocationStore && (
+                      <div className="form-text text-success"></div>
                     )}
-                    {dropoffSuggestions.length > 0 && (
-                      <ul className="list-group position-absolute w-100 z-3" style={{ maxHeight: 180, overflowY: "auto" }}>
-                        {dropoffSuggestions.map((item) => (
-                          <li
-                            key={item.id}
-                            className="list-group-item list-group-item-action"
-                            onMouseDown={() => {
-                              setLocalForm((prev) => ({ ...prev, dropoff: item.city }));
-                              setForm && setForm((prev) => ({ ...prev, dropoff: item.city }));
-                              setSuggestionSelected((prev) => ({ ...prev, dropoff: true }));
-                              fetchPlaceDetails(item.id, "dropoff");
-                              setDropoffSuggestions([]);
-                            }}
-                          >
-                            <span className="fw-bold">{item.city}</span>
-                            {item.district && <span className="text-secondary ms-1">{item.district}</span>}
-                            {item.state && <span className="text-muted ms-1">{item.state}</span>}
-                          </li>
-                        ))}
-                      </ul>
+                    {fieldErrors.to_location && (
+                      <div className="invalid-feedback">
+                        {fieldErrors.to_location.join
+                          ? fieldErrors.to_location.join(" ")
+                          : fieldErrors.to_location}
+                      </div>
+                    )}
+                  </div>
+                  {/* Pick Up Date & Time */}
+                  <div className="col-md-4 mb-3">
+                    <label htmlFor="pickupDate" className="form-label">
+                      Pick Up Date &amp; Time
+                    </label>
+                    <DatePicker
+                      value={form.pickupDate}
+                      onChange={([date]) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          pickupDate: date,
+                        }))
+                      }
+                    />
+                    {fieldErrors.trip_start_date && (
+                      <div className="invalid-feedback d-block">
+                        {fieldErrors.trip_start_date.join
+                          ? fieldErrors.trip_start_date.join(" ")
+                          : fieldErrors.trip_start_date}
+                      </div>
+                    )}
+                  </div>
+                  {/* Return Date & Time */}
+                  <div className="col-md-4 mb-3">
+                    <label htmlFor="returnDate" className="form-label">
+                      Return Date &amp; Time
+                    </label>
+                    <DatePicker
+                      value={form.returnDate}
+                      onChange={([date]) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          returnDate: date,
+                        }))
+                      }
+                    />
+                    {fieldErrors.trip_end_date && (
+                      <div className="invalid-feedback d-block">
+                        {fieldErrors.trip_end_date.join
+                          ? fieldErrors.trip_end_date.join(" ")
+                          : fieldErrors.trip_end_date}
+                      </div>
                     )}
                   </div>
                 </div>
-              </div>
-              <div className="row">
-                <div className="col-md-6 mb-3">
-                  <label className="form-label">Pick Up Date &amp; Time</label>
-                  <div className="d-flex gap-2">
-                    <input
-                      type="date"
-                      name="pickupDate"
-                      min={today}
-                      className="form-control"
-                      value={localForm.pickupDate}
-                      onChange={handleChange}
-                      required
-                    />
+
+                <div className="row">
+                  {/* Trip Type */}
+                  <div className="col-md-6 mb-3">
+                    <label htmlFor="tripType" className="form-label">
+                      Trip Type
+                    </label>
                     <select
-                      name="pickupTime"
-                      className="form-select"
-                      value={localForm.pickupTime}
-                      onChange={handleChange}
+                      id="tripType"
+                      className={`form-select${fieldErrors.trip_type ? " is-invalid" : ""}`}
                       required
+                      value={form.tripType}
+                      onChange={handleChange}
                     >
-                      <option value="">Time</option>
-                      {generateTimeOptions()}
-                    </select>
-                  </div>
-                </div>
-                <div className="col-md-6 mb-3">
-                  <label className="form-label">Return Date &amp; Time</label>
-                  <div className="d-flex gap-2">
-                    <input
-                      type="date"
-                      name="returnDate"
-                      min={localForm.pickupDate}
-                      className="form-control"
-                      value={localForm.returnDate}
-                      onChange={handleChange}
-                      required
-                    />
-                    <select
-                      name="returnTime"
-                      className="form-select"
-                      value={localForm.returnTime}
-                      onChange={handleChange}
-                      required
-                    >
-                      <option value="">Time</option>
-                      {generateTimeOptions()}
-                    </select>
-                  </div>
-                </div>
-              </div>
-              <div className="row">
-                <div className="col-md-6 mb-3">
-                  <label className="form-label">Vehicle Type</label>
-                  <select
-                    name="vehicleType"
-                    className="form-select"
-                    value={localForm.vehicleType}
-                    onChange={handleChange}
-                    disabled={loadingTypes || !!typesError}
-                    required
-                  >
-                    <option value="">
-                      {loadingTypes
-                        ? "Loading vehicle types..."
-                        : typesError
-                        ? "Failed to load types"
-                        : "Select vehicle type"}
-                    </option>
-                    {vehicleTypes.map((type) => (
-                      <option key={type.id} value={type.id}>
-                        {type.type_name} {type.seat_capacity ? `(${type.seat_capacity} seats)` : ""}
+                      <option value="" disabled>
+                        Select trip type
                       </option>
-                    ))}
-                  </select>
+                      {tripTypes.map((type) => (
+                        <option
+                          key={type.trip_type}
+                          value={type.id}
+                          style={{ color: "#000" }}
+                        >
+                          {type.trip_type}
+                        </option>
+                      ))}
+                    </select>
+                    {fieldErrors.trip_type && (
+                      <div className="invalid-feedback">
+                        {fieldErrors.trip_type.join
+                          ? fieldErrors.trip_type.join(" ")
+                          : fieldErrors.trip_type}
+                      </div>
+                    )}
+                  </div>
+                  {/* View Point */}
+                  <div className="col-md-6 mb-3">
+                    <label htmlFor="view_points" className="form-label">
+                      View Point
+                    </label>
+                    <input
+                      type="text"
+                      id="view_points"
+                      className={`form-control${fieldErrors.view_points ? " is-invalid" : ""}`}
+                      placeholder="Enter view point"
+                      required
+                      value={form.view_points}
+                      onChange={handleChange}
+                    />
+                    {fieldErrors.view_points && (
+                      <div className="invalid-feedback">
+                        {fieldErrors.view_points.join
+                          ? fieldErrors.view_points.join(" ")
+                          : fieldErrors.view_points}
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div className="col-md-6 mb-3 d-flex align-items-end">
-                  <button
-                    type="submit"
-                    className="btn btn-primary w-100"
-                    style={{ letterSpacing: ".5px" }}
-                  >
-                    Search Vehicle
+
+                {/* Submit */}
+                <div className="text-center view-all ">
+                  <button type="submit" className="btn btn-primary">
+                    Confirm Booking
                   </button>
                 </div>
-              </div>
-            </form>
-            {/* Optionally, show search results or distance info here */}
+              </form>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
-}
+};
+
+export default BookingModal;

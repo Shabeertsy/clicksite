@@ -1,154 +1,128 @@
-import React, { useRef, useEffect, useState } from "react";
-import './Hero.css'
+import React, { useRef, useEffect, useState, useCallback } from "react";
+import "./Hero.css";
 import CustomDropdown from "./CustomDropdown";
+import LocationAutocomplete from "./LocationAutocomplete/LocationAutocomplete";
+import { useVehicleStore } from "../store/vehicleStore";
+import { useBookingStore } from "../store/bookingStore";
+import DatePicker from "./Datepicker/DatePicker";
 
-function LocationAutocomplete({ label = "Drop Off Location", placeholder = "Search Location", onSelect }) {
-  const [input, setInput] = useState("");
-  const [suggestions, setSuggestions] = useState([]);
-  const [open, setOpen] = useState(false);
-  const inputRef = useRef(null);
-  const containerRef = useRef(null);
 
-  useEffect(() => {
-    if (!window.google || !window.google.maps || !window.google.maps.places) {
-      let interval = setInterval(() => {
-        if (window.google && window.google.maps && window.google.maps.places) {
-          clearInterval(interval);
-        }
-      }, 200);
-      return () => clearInterval(interval);
-    }
-  }, []);
 
-  useEffect(() => {
-    let active = true;
-    if (!input || !window.google || !window.google.maps || !window.google.maps.places) {
-      setSuggestions([]);
+const Hero = () => {
+  const [pickupCoords, setPickupCoords] = useState({ lat: null, lng: null });
+  const [dropoffCoords, setDropoffCoords] = useState({ lat: null, lng: null });
+  const [isLoading, setIsLoading] = useState(false);
+
+  const [fromDate, setFromDate] = useState(null);
+  const [toDate, setToDate] = useState(null);
+
+  const selected = useVehicleStore((state) => state.selected);
+  const pickupLocation = useBookingStore((state) => state.pickupLocation);
+  const dropoffLocation = useBookingStore((state) => state.dropoffLocation);
+  const pickupCoordsStore = useBookingStore((state) => state.pickupCoords);
+  const dropoffCoordsStore = useBookingStore((state) => state.dropoffCoords);
+
+  const setDistance = useVehicleStore((state) => state.setDistance);
+
+  console.log(
+    "log check adfafdafadf",
+    selected,
+    pickupLocation,
+    pickupCoordsStore,
+    dropoffLocation,
+    dropoffCoordsStore
+  );
+
+  // Fetch distance only after dropoff location is completed
+  const fetchDistance = useCallback(() => {
+    if (
+      !pickupCoords.lat ||
+      !pickupCoords.lng ||
+      !dropoffCoords.lat ||
+      !dropoffCoords.lng
+    ) {
+      setDistance({ text: "", value: null });
       return;
     }
-    const service = new window.google.maps.places.AutocompleteService();
-    service.getPlacePredictions(
+
+    if (!window.google?.maps?.DistanceMatrixService) {
+      setDistance({ text: "Google Maps not loaded", value: null });
+      return;
+    }
+
+    setIsLoading(true);
+    const service = new window.google.maps.DistanceMatrixService();
+    service.getDistanceMatrix(
       {
-        input,
-        componentRestrictions: { country: "in" },
-        types: ["(cities)"],
+        origins: [
+          new window.google.maps.LatLng(pickupCoords.lat, pickupCoords.lng),
+        ],
+        destinations: [
+          new window.google.maps.LatLng(dropoffCoords.lat, dropoffCoords.lng),
+        ],
+        travelMode: window.google.maps.TravelMode.DRIVING,
       },
-      (predictions, status) => {
-        if (active) {
-          if (status === window.google.maps.places.PlacesServiceStatus.OK && predictions) {
-            setSuggestions(predictions);
-          } else {
-            setSuggestions([]);
-          }
+      (response, status) => {
+        setIsLoading(false);
+        if (
+          status === "OK" &&
+          response?.rows?.[0]?.elements?.[0]?.status === "OK"
+        ) {
+          const element = response.rows[0].elements[0];
+          setDistance({
+            text: element.distance.text,
+            value: element.distance.value,
+          });
+        } else {
+          setDistance({ text: "Error fetching distance", value: null });
         }
       }
     );
-    return () => {
-      active = false;
-    };
-  }, [input]);
+  }, [pickupCoords, dropoffCoords, setDistance]);
 
-  
   useEffect(() => {
-    function handleClickOutside(event) {
-      if (containerRef.current && !containerRef.current.contains(event.target)) {
-        setOpen(false);
-      }
+    if (
+      dropoffCoords.lat &&
+      dropoffCoords.lng &&
+      pickupCoords.lat &&
+      pickupCoords.lng
+    ) {
+      fetchDistance();
     }
-    window.addEventListener("mousedown", handleClickOutside);
-    return () => window.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  }, [dropoffCoords, pickupCoords, fetchDistance]);
 
-  function handleSelect(suggestion) {
-    setInput(suggestion.description);
-    setSuggestions([]);
-    setOpen(false);
-    if (onSelect) onSelect(suggestion.description);
-  }
+  useEffect(() => {
+    if (
+      pickupCoords.lat &&
+      pickupCoords.lng &&
+      dropoffCoords.lat &&
+      dropoffCoords.lng
+    ) {
+      fetchDistance();
+    }
+  }, [pickupCoords, dropoffCoords, fetchDistance]);
 
-  return (
-    <div className="form-item dropdown ps-2 ps-sm-3" ref={containerRef} style={{ position: "relative", width: "100%" }}>
-      <div
-        data-bs-toggle="dropdown"
-        data-bs-auto-close="outside"
-        aria-expanded={open}
-        role="menu"
-        onClick={() => setOpen(true)}
-      >
-        <label className="form-label fs-14 text-default mb-1">
-          {label}
-        </label>
-        <br />
-        <span>{input || "Calicut"}</span>
-      </div>
-      <div className="dropdown-menu dropdown-md p-0" style={{ display: open ? "block" : "none", position: "absolute", width: "100%", zIndex: 2 }}>
-        <div className="input-search p-3 border-bottom">
-          <div className="input-group">
-            <input
-              ref={inputRef}
-              type="text"
-              className="form-control"
-              placeholder={placeholder}
-              value={input}
-              onChange={e => {
-                setInput(e.target.value);
-                setOpen(true);
-              }}
-              onFocus={() => setOpen(true)}
-              autoComplete="off"
-              style={{ background: "#fff" }}
-            />
-            <span className="input-group-text px-2 border-start-0">
-              <i className="isax isax-search-normal"></i>
-            </span>
-          </div>
-        </div>
-        {suggestions.length > 0 && (
-          <div style={{ maxHeight: 200, overflowY: "auto", background: "#fff" }}>
-            {suggestions.map(suggestion => (
-              <div
-                key={suggestion.place_id}
-                className="dropdown-item"
-                style={{
-                  padding: "5px",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                }}
-                onClick={() => handleSelect(suggestion)}
-              >
-                 <span className="input-group-text px-2 border-start-0 m-1">
-              <i className="isax isax-location5"></i>
-            </span>
-                {suggestion.description}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-
-
-export default function Hero() {
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    fetchDistance();
+  };
 
   return (
     <section className="hero-section">
       <div className="banner-slider banner-sec owl-carousel">
-        <div className="slider-img">
-          <img src="assets/img/banner/banner-01.jpg" alt="Img" />
-        </div>
-        <div className="slider-img">
-          <img src="assets/img/banner/banner-02.jpg" alt="Img" />
-        </div>
-        <div className="slider-img">
-          <img src="assets/img/banner/banner-03.jpg" alt="Img" />
-        </div>
-        <div className="slider-img">
-          <img src="assets/img/banner/banner-04.jpg" alt="Img" />
-        </div>
+        {[
+          "banner-01.jpg",
+          "banner-02.jpg",
+          "banner-03.jpg",
+          "banner-04.jpg",
+        ].map((img, index) => (
+          <div key={index} className="slider-img">
+            <img
+              src={`assets/img/banner/${img}`}
+              alt={`Banner ${index + 1}`}
+            />
+          </div>
+        ))}
       </div>
       <div className="container">
         <div className="hero-content">
@@ -159,62 +133,68 @@ export default function Hero() {
             >
               <div className="banner-content mx-auto">
                 <h1 className="text-white display-5 mb-2">
-                  Get Closer to the Dream: <span>Your Tour</span> Essentials Await
+                  Get Closer to the Dream: <span>Your Tour</span> Essentials
+                  Await
                 </h1>
                 <h6 className="text-light mx-auto">
-                  Your ultimate destination for all things help you celebrate &amp; remember tour experience.
+                  Your ultimate destination for all things to help you celebrate
+                  & remember your tour experience.
                 </h6>
               </div>
               <div className="banner-form card mb-0">
                 <div className="card-body">
-                  <div>
-                    <div className="tab-content">
-                      <div className="tab-pane fade active show" id="flight">
-                        <form action="https://dreamstour.dreamstechnologies.com/html/flight-grid.html">
-                          <div className="normal-trip">
-                            <div className="d-lg-flex">
-                              <div className="d-flex form-info">
+                  <div className="tab-content">
+                    <div
+                      className="tab-pane fade active show"
+                      id="flight"
+                    >
+                      <form onSubmit={handleSubmit}>
+                        <div className="normal-trip">
+                          <div className="d-lg-flex">
+                            <div className="d-flex form-info">
+                              <LocationAutocomplete
+                                label="Pickup Location"
+                                placeholder="Search Location"
+                                dropoff={false}
+                                setCoords={setPickupCoords}
+                              />
+                              <LocationAutocomplete
+                                label="Drop Off Location"
+                                placeholder="Search Location"
+                                dropoff={true}
+                                setCoords={setDropoffCoords}
+                              />
 
-                                <LocationAutocomplete label="Drop Off Location" placeholder="Search Location" />
-                                <LocationAutocomplete label="Drop Off Location" placeholder="Search Location" />
-                                <div className="form-item">
-                                  <label className="form-label fs-14 text-default mb-1">From Date</label>
-                                  <input
-                                    type="text"
-                                    id="checkin"
-                                    className="form-control"
-                                    placeholder="Today Date"
-                                    data-enable-time="true"
-                                    data-date-format="d-m-Y H:i"
-                                    data-min-date="today"
-                                    autoComplete="off"
-                                  />
-                                </div>
-                                {/* To Date */}
-                                <div className="form-item">
-                                  <label className="form-label fs-14 text-default mb-1">
-                                    To Date
-                                  </label>
-                                  <input
-                                    type="text"
-                                    id="checkout"
-                                    className="form-control"
-                                    placeholder="Today Date"
-                                  />
-                                </div>
-                                {/* Custom Dropdown */}
-                                <CustomDropdown />
+                              <div className="form-item ">
+                                <label className="form-label fs-14 text-default mb-1">
+                                  From Date
+                                </label>
+                                <DatePicker
+                                  value={fromDate}
+                                  onChange={([date]) => setFromDate(date)}
+                                />
                               </div>
-                              <button
-                                type="submit"
-                                className="btn btn-primary search-btn rounded"
-                              >
-                                Search
-                              </button>
+                              <div className="form-item">
+                                <label className="form-label fs-14 text-default mb-1">
+                                  To Date
+                                </label>
+                                <DatePicker
+                                  value={toDate}
+                                  onChange={([date]) => setToDate(date)}
+                                />
+                              </div>
+                              <CustomDropdown />
                             </div>
+                            <button
+                              type="submit"
+                              className="btn btn-primary search-btn rounded"
+                              disabled={isLoading}
+                            >
+                              {isLoading ? "Loading..." : "Search"}
+                            </button>
                           </div>
-                        </form>
-                      </div>
+                        </div>
+                      </form>
                     </div>
                   </div>
                 </div>
@@ -225,4 +205,6 @@ export default function Hero() {
       </div>
     </section>
   );
-}
+};
+
+export default Hero;
