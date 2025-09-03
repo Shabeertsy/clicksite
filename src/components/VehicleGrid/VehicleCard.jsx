@@ -2,6 +2,13 @@ import React, { useEffect, useState } from "react";
 import CustomDropdown from "../CustomDropdown";
 import BookingModal from "../BookingModal";
 import { useVehicleStore } from "../../store/vehicleStore";
+import { Swiper, SwiperSlide } from "swiper/react";
+import "swiper/css";
+import "swiper/css/navigation";
+import { Navigation, Pagination } from "swiper/modules";
+import "swiper/css/pagination";
+import "swiper/css/navigation";
+import './grid.css'
 
 function calculateTotalAmount(vehicle, distanceValue) {
   if (!distanceValue || !vehicle) return null;
@@ -54,7 +61,6 @@ const VehicleCard = ({
     }
   }, [distance.value, vehicleData]);
 
-  
   const openBookingModal = (e) => {
     e.preventDefault();
     if (window.bootstrap) {
@@ -68,32 +74,54 @@ const VehicleCard = ({
     }
   };
 
+  // Helper to handle image error fallback
+  const handleImageError = (e) => {
+    e.target.onerror = null;
+    e.target.src = "/default-vehicle.jpg";
+  };
+
   return (
     <>
       <div className="col-lg-4">
         <div className="place-item mb-4">
           <div className="place-img">
-            <div className="img-slider image-slide owl-carousel nav-center">
-              {Array.isArray(images) && images.length > 0 ? (
-                images.map((img, i) => (
-                  <div key={i} className="slide-images">
-                    <a href="hotel-details.html">
-                      <img
-                        src={img?.image ? img.image : img}
-                        className="img-fluid"
-                        alt={`vehicle-img-${i}`}
-                        onError={e => { e.target.onerror = null; e.target.src = "/default-vehicle.jpg"; }}
-                      />
-                    </a>
-                  </div>
-                ))
-              ) : (
-                <div className="slide-images">
-                  <a href="hotel-details.html">
-                    <img src="/default-vehicle.jpg" className="img-fluid" alt="default vehicle" />
-                  </a>
-                </div>
-              )}
+            <div className="img-slider image-slide">
+              <Swiper
+                modules={[Navigation, Pagination]}
+                navigation
+                pagination={{ clickable: true }}
+                loop={true}
+                className="vehicle-carousel"
+              >
+                {Array.isArray(images) && images.length > 0 ? (
+                  images.map((img, i) => (
+                    <SwiperSlide key={i}>
+                      <div className="slide-images">
+                        <a href="hotel-details.html">
+                          <img
+                            src={img?.image ? img.image : img}
+                            className="img-fluid"
+                            alt={`vehicle-img-${i}`}
+                            onError={handleImageError}
+                          />
+                        </a>
+                      </div>
+                    </SwiperSlide>
+                  ))
+                ) : (
+                  <SwiperSlide>
+                    <div className="slide-images">
+                      <a href="hotel-details.html">
+                        <img
+                          src="/default-vehicle.jpg"
+                          className="img-fluid"
+                          alt="default vehicle"
+                        />
+                      </a>
+                    </div>
+                  </SwiperSlide>
+                )}
+              </Swiper>
             </div>
             <div className="fav-item">
               <a href="" className="fav-icon selected">
