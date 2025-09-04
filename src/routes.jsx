@@ -13,7 +13,7 @@ const routes = [
     element: <LoginForm />,
   },
   {
-    path: "/packages",
+    path: "/packages/:id",
     element: <PackageListPage />,
   }
 ];

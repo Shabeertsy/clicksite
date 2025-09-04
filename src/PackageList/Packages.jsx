@@ -20,6 +20,8 @@ function normalizePackage(pkg) {
 
 // Helper to normalize a header object
 function normalizeHeader(header) {
+  console.log(header,'asdfadfafafafffaddfads');
+  
   return {
     id: header.id,
     title: header.title || header.head || "Untitled Header",
