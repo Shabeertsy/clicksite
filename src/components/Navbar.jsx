@@ -1,16 +1,15 @@
 import React from 'react';
 
+
 export default function Navbar() {
   return (
     <div className="main-header">
-      {/* <!-- Header Topbar--> */}
-      {/* <!-- /Header Topbar--> */}
 
       {/* <!-- Header --> */}
       <header>
         <div className="container">
           {/* <!-- Mobile menu--> */}
-          {/*
+          
           <div className="offcanvas-info">
             <div className="offcanvas-wrap">
               <div className="offcanvas-detail">
@@ -113,15 +112,13 @@ export default function Navbar() {
                         Sign In
                       </a>
                     </div>
-                    <a href="become-an-expert.html" className="btn btn-primary w-100">
-                      Become Expert
-                    </a>
+                 
                   </div>
                 </div>
               </div>
             </div>
           </div>
-          */}
+         
           {/* <!-- Mobile menu--> */}
 
           <div className="offcanvas-overlay"></div>

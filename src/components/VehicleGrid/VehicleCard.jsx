@@ -9,6 +9,7 @@ import { Navigation, Pagination } from "swiper/modules";
 import "swiper/css/pagination";
 import "swiper/css/navigation";
 import './grid.css'
+import Loader from "../Loader/Loader";
 
 function calculateTotalAmount(vehicle, distanceValue) {
   if (!distanceValue || !vehicle) return null;
@@ -86,6 +87,7 @@ const VehicleCard = ({
         <div className="place-item mb-4">
           <div className="place-img">
             <div className="img-slider image-slide">
+             
               <Swiper
                 modules={[Navigation, Pagination]}
                 navigation
@@ -94,28 +96,67 @@ const VehicleCard = ({
                 className="vehicle-carousel"
               >
                 {Array.isArray(images) && images.length > 0 ? (
-                  images.map((img, i) => (
-                    <SwiperSlide key={i}>
-                      <div className="slide-images">
-                        <a href="hotel-details.html">
-                          <img
-                            src={img?.image ? img.image : img}
-                            className="img-fluid"
-                            alt={`vehicle-img-${i}`}
-                            onError={handleImageError}
-                          />
-                        </a>
-                      </div>
-                    </SwiperSlide>
-                  ))
+                  images.map((img, i) => {
+                    const [imgLoaded, setImgLoaded] = useState(false);
+                    function SlideWithLoader({ src, alt }) {
+                      const [loaded, setLoaded] = useState(false);
+                      return (
+                        <div className="slide-images" style={{ position: "relative", minHeight: 200 }}>
+                          {!loaded && (
+                            <div
+                              style={{
+                                position: "absolute",
+                                top: 0,
+                                left: 0,
+                                width: "100%",
+                                height: "100%",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                background: "rgba(255,255,255,0.7)",
+                                zIndex: 2,
+                              }}
+                            >
+                              <Loader />
+                            </div>
+                          )}
+                          <a href="hotel-details.html">
+                            <img
+                              src={src}
+                              className="img-fluid"
+                              alt={alt}
+                              onError={handleImageError}
+                              onLoad={() => setLoaded(true)}
+                              style={loaded ? {} : { visibility: "hidden" }}
+                            />
+                          </a>
+                        </div>
+                      );
+                    }
+                    return (
+                      <SwiperSlide key={i}>
+                        <SlideWithLoader
+                          src={img?.image ? img.image : img}
+                          alt={`vehicle-img-${i}`}
+                        />
+                      </SwiperSlide>
+                    );
+                  })
                 ) : (
                   <SwiperSlide>
-                    <div className="slide-images">
+                    <div className="slide-images" style={{ position: "relative", minHeight: 200 }}>
+                      <Loader />
                       <a href="hotel-details.html">
                         <img
                           src="/default-vehicle.jpg"
                           className="img-fluid"
                           alt="default vehicle"
+                          style={{ visibility: "hidden" }}
+                          onLoad={e => {
+                            // Hide loader when default image loads
+                            e.target.previousSibling && (e.target.previousSibling.style.display = "none");
+                            e.target.style.visibility = "visible";
+                          }}
                         />
                       </a>
                     </div>

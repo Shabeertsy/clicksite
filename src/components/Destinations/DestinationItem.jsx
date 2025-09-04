@@ -1,11 +1,13 @@
 // src/components/DestinationItem.jsx
 export default function DestinationItem({ dest }) {
+  console.log(dest);
+  
     return (
       <div
         className="destination-item mb-4 wow fadeInUp"
         data-wow-delay="0.2s"
       >
-        <img src={dest.img} alt={dest.title} />
+        <img src={dest.img} alt={dest.img} />
         <div className="destination-info text-center">
           <div className="destination-content">
             <h5 className="mb-1 text-white">{dest.title}</h5>
@@ -14,15 +16,10 @@ export default function DestinationItem({ dest }) {
             <div className="d-flex">
               <div
                 className={`col${
-                  dest.hotels || dest.cruises ? " border-end" : ""
+                  dest.title || dest.title ? " border-end" : ""
                 }`}
               >
-                <div className="count-info text-center">
-                  <span className="d-block mb-1 text-indigo">
-                    <i className="isax isax-airplane"></i>
-                  </span>
-                  <h6 className="fs-13 fw-medium">{dest.flights}</h6>
-                </div>
+             
               </div>
               {dest.hotels && (
                 <div className={`col${dest.cruises ? " border-end" : ""}`}>

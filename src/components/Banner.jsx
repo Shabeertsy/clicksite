@@ -1,13 +1,13 @@
 import React from "react";
 
-export default function Banner() {
+export default function Banner({ image, link, alt }) {
   return (
     <div className="">
-      <a href="https://qspurtsolutions.com/" target="_blank" rel="noopener noreferrer">
+      <a href={link || "https://qspurtsolutions.com/"} target="_blank" rel="noopener noreferrer">
         <img
-          src="assets/img/banner/banner-01.jpg"
+          src={image || "assets/img/banner/banner-01.jpg"}
           className="img-fluid custom-ads"
-          alt=""
+          alt={alt || ""}
         />
       </a>
     </div>
